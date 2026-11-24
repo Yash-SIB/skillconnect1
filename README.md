@@ -33,4 +33,8 @@ npm.cmd run build
 
 Conversations, drafts, messages, profile changes, and checklist progress live in the current browser tab and reset on reload. The invite flow sends no email. Mentions send no notifications. Attachment previews keep file names only. Integrations and calls are previews. Phase 1 requires no credentials or services.
 
-The next milestone is a protected workspace with Google sign-in and approved employee access.
+The sign-in preview is at [localhost:3000/login](http://localhost:3000/login) and needs no credentials. See the [authentication plan](docs/authentication.md) for the Google Cloud setup, employee approval rules, and future Go API trust boundary.
+
+## Backend
+
+The [Go API guide](apps/api/README.md) covers the local PostgreSQL setup, migrations, health endpoint, and tests.
