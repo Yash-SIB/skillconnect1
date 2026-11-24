@@ -1,0 +1,136 @@
+﻿.page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: clamp(16px, 5vw, 48px);
+  background: radial-gradient(ellipse at 50% 12%, #22343d 0%, transparent 58%), var(--background);
+}
+
+.card {
+  position: relative;
+  display: grid;
+  width: min(100%, 440px);
+  padding: clamp(22px, 5vw, 36px);
+  border: 1px solid #414c56;
+  border-radius: 18px;
+  background: #252b31;
+  text-align: center;
+  box-shadow: 0 22px 70px #0a111680;
+}
+
+.card::before {
+  position: absolute;
+  inset: 0 26px auto;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--blue) 0 66%, var(--orange) 66% 86%, var(--yellow) 86%);
+  content: "";
+}
+
+.intro {
+  margin-bottom: 26px;
+}
+
+.logo {
+  display: grid;
+  place-items: center;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto 24px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #f8f9fa;
+}
+
+.logo img {
+  max-width: 100%;
+  height: auto;
+}
+
+.intro h1 {
+  margin-bottom: 10px;
+  color: var(--text);
+  font-size: clamp(24px, 4.5vw, 33px);
+  font-weight: 750;
+  line-height: 1.15;
+  letter-spacing: -.04em;
+}
+
+.intro h1 span {
+  color: var(--blue);
+}
+
+.intro p {
+  max-width: 32ch;
+  margin-inline: auto;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+.provider {
+  min-height: 46px;
+  padding: 10px 14px;
+  border: 1px solid #4d8796;
+  border-radius: 9px;
+  color: #c7edf5;
+  background: #24434e;
+  font-weight: 700;
+}
+
+.provider:disabled {
+  cursor: not-allowed;
+}
+
+.status, .restriction {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.status {
+  margin-top: 11px;
+}
+
+.status span {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--yellow);
+}
+
+.footer {
+  margin-top: 24px;
+  padding-top: 17px;
+  border-top: 1px solid var(--border);
+}
+
+.restriction svg, .preview svg {
+  width: 16px;
+  height: 16px;
+}
+
+.preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  margin-top: 8px;
+  padding-inline: 10px;
+  border-radius: 7px;
+  color: var(--blue);
+  font-weight: 650;
+}
+
+.preview:hover {
+  background: #2c3a43;
+}
+
+.preview:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
