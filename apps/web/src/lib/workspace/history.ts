@@ -25,3 +25,48 @@ export function acceptSent(current: ApiMessagePage, message: ApiMessage): ApiMes
   if (current.messages.some(({ id }) => id === message.id)) return current;
   return { ...current, messages: [...current.messages, message].sort(newestFirst) };
 }
+
+export function mergeMessages(current: ApiMessage[], incoming: ApiMessage[]) {
+  if (incoming.length === 0) return current;
+  const messages = new Map(current.map((message) => [message.id, message]));
+  for (const message of incoming) {
+    if (!messages.has(message.id)) messages.set(message.id, message);
+  }
+  return [...messages.values()].sort(newestFirst);
+}
+
+type Recovery = {
+  page: ApiMessagePage;
+  coverage: "overlap" | "exhausted" | "incomplete";
+};
+
+// Walk newest-first to the oldest previously loaded REST row. A match against
+// just any live event would skip earlier holes when events arrive out of order.
+export async function recoverHistory(
+  fetchPage: (cursor: string | undefined, signal: AbortSignal) => Promise<ApiMessagePage>,
+  boundary: string | undefined,
+  signal: AbortSignal,
+  maxPages = 10,
+): Promise<Recovery> {
+  let page: ApiMessagePage = { messages: [] };
+  const cursors = new Set<string>();
+  for (let count = 0; count < maxPages; count++) {
+    signal.throwIfAborted();
+    const result = await fetchPage(page.next_cursor, signal);
+    signal.throwIfAborted();
+    page = appendOlder(page, result);
+    if (!result.next_cursor) return { page, coverage: "exhausted" };
+    if (boundary && result.messages.some(({ id }) => id === boundary)) return { page, coverage: "overlap" };
+    if (cursors.has(result.next_cursor)) break;
+    cursors.add(result.next_cursor);
+  }
+  return { page, coverage: "incomplete" };
+}
+
+export function reconcileRecovery(current: ApiMessagePage, recovery: Recovery): ApiMessagePage {
+  const usedCursor = current.messages.length > 0 ? current.next_cursor : recovery.page.next_cursor;
+  return {
+    messages: mergeMessages(current.messages, recovery.page.messages),
+    next_cursor: recovery.coverage === "exhausted" ? undefined : usedCursor,
+  };
+}

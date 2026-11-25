@@ -243,6 +243,7 @@ button, summary { -webkit-tap-highlight-color: transparent; }
 .conversation-members li { display: flex; gap: 9px; align-items: center; }
 .history-button { display: block; margin: 8px auto; padding: 5px 10px; color: var(--blue); border: 1px solid var(--border); border-radius: 6px; }
 .history-button:hover { background: var(--surface); }
+.workspace-connection { grid-column: 2 / -1; justify-self: end; color: var(--muted); font-size: 12px; }
 
 @media (max-width: 1080px) {
   .workspace { grid-template-columns: 68px 233px minmax(0, 1fr); }
