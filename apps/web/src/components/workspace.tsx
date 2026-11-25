@@ -1,7 +1,8 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef, useState } from "react";
-import { channels, conversationLabel, directMessage, initialMessages, people, profile as demoProfile, type Message, type Panel, type Person, type Task } from "@/lib/demo";
+ import { demoWorkspace } from "@/lib/workspace/demo-adapter";
+ import { conversationLabel, messageTime, type Panel, type Person, type Task } from "@/lib/workspace/models";
 import { ChatHeader, MessageList } from "./chat";
 import { MessageComposer } from "./composer";
 import { Modal, WorkspaceDialog } from "./dialogs";
@@ -10,15 +11,16 @@ import { NavigationRail, WorkspaceSidebar } from "./navigation";
 import { IconButton } from "./ui";
 
 export function Workspace() {
-  const [conversations, setConversations] = useState(() => [...channels, ...people.slice(0, 3).map(directMessage)]);
-  const [activeId, setActiveId] = useState("general");
-  const [messages, setMessages] = useState(initialMessages);
+  const [initial] = useState(demoWorkspace.initial);
+  const [conversations, setConversations] = useState(initial.conversations);
+  const [activeId, setActiveId] = useState(demoWorkspace.home.id);
+  const [messages, setMessages] = useState(initial.messages);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [draftFiles, setDraftFiles] = useState<Record<string, string[]>>({});
   const [favorites, setFavorites] = useState<string[]>([]);
   const [done, setDone] = useState<Task[]>([]);
   const [panel, setPanel] = useState<Panel | null>(null);
-  const [profile, setProfile] = useState(demoProfile);
+  const [profile, setProfile] = useState(initial.profile);
   const [handbook, setHandbook] = useState("");
   const [notice, setNotice] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -31,7 +33,7 @@ export function Workspace() {
   const closeNavigationButton = useRef<HTMLButtonElement>(null);
   const conversationTitle = useRef<HTMLHeadingElement>(null);
 
-  const conversation = conversations.find(({ id }) => id === activeId) ?? channels[0];
+  const conversation = conversations.find(({ id }) => id === activeId) ?? demoWorkspace.home;
   const currentMessages = messages[activeId] ?? [];
   const draft = drafts[activeId] ?? "";
   const attachments = draftFiles[activeId] ?? [];
@@ -91,13 +93,7 @@ export function Workspace() {
   function send() {
     const text = draft.trim();
     if (!text && !attachments.length) return;
-    const entry: Message = {
-      id: `local-${++nextMessageId.current}`,
-      author: profile,
-      text,
-      attachments,
-      time: currentTime(),
-    };
+    const entry = demoWorkspace.send(`local-${++nextMessageId.current}`, profile, text, attachments);
     setTarget(undefined);
     setMessages((previous) => ({ ...previous, [activeId]: [...(previous[activeId] ?? []), entry] }));
     setDraft("");
@@ -121,7 +117,7 @@ export function Workspace() {
   }
 
   function saveWelcome(text: string) {
-    const time = currentTime();
+    const time = messageTime();
     setMessages((previous) => {
       const entries = previous[activeId] ?? [];
       const updated = entries.some(({ id }) => id === welcomeId)
@@ -143,7 +139,7 @@ export function Workspace() {
   }
 
   function startDm(person: Person) {
-    setConversations((previous) => previous.some(({ id }) => id === person.id) ? previous : [...previous, directMessage(person)]);
+    setConversations((previous) => previous.some(({ id }) => id === person.id) ? previous : [...previous, demoWorkspace.directMessage(person)]);
     choose(person.id);
   }
 
@@ -170,18 +166,18 @@ export function Workspace() {
         </div>
         <button type="button" className="global-search" onClick={() => openSearch("all")}><Icon name="search" /><span>Search Skillinabox</span><kbd>Ctrl K</kbd></button>
       </header>
-      <NavigationRail profile={profile} open={setPanel} home={() => choose("general")} />
-      <WorkspaceSidebar conversations={conversations} activeId={activeId} choose={choose} open={setPanel} done={done} mobileOpen={mobileOpen} closeMobile={closeNavigation} closeButtonRef={closeNavigationButton} focusComposer={() => {
+      <NavigationRail profile={profile} open={setPanel} home={() => choose(demoWorkspace.home.id)} />
+      <WorkspaceSidebar conversations={conversations} activeId={activeId} choose={choose} open={setPanel} done={done} homeId={demoWorkspace.home.id} mobileOpen={mobileOpen} closeMobile={closeNavigation} closeButtonRef={closeNavigationButton} focusComposer={() => {
         setMobileOpen(false);
         requestAnimationFrame(() => composer.current?.focus());
       }} />
       <main className="chat">
         <ChatHeader titleRef={conversationTitle} conversation={conversation} favorite={favorites.includes(activeId)} toggleFavorite={() => setFavorites((previous) => previous.includes(activeId) ? previous.filter((id) => id !== activeId) : [...previous, activeId])} open={setPanel} search={() => openSearch("current")} />
         <MessageList key={activeId} conversation={conversation} messages={currentMessages} open={setPanel} target={target} />
-        <MessageComposer conversation={conversation} draft={draft} attachments={attachments} change={setDraft} addAttachments={addAttachments} removeAttachment={removeAttachment} send={send} open={setPanel} inputRef={composer} />
+        <MessageComposer conversation={conversation} draft={draft} attachments={attachments} change={setDraft} addAttachments={addAttachments} removeAttachment={removeAttachment} send={send} open={setPanel} inputRef={composer} teammates={demoWorkspace.teammates} />
       </main>
       <div className={notice ? "notice" : "sr-only"} role="status">{notice}{notice && <IconButton icon="close" label="Dismiss status" onClick={() => setNotice("")} />}</div>
-      {panel && <WorkspaceDialog key={panel} panel={panel} close={() => setPanel(null)} conversation={conversation} profile={profile} addChannel={addChannel} invite={() => {
+      {panel && <WorkspaceDialog key={panel} panel={panel} close={() => setPanel(null)} conversation={conversation} profile={profile} teammates={demoWorkspace.teammates} addChannel={addChannel} invite={() => {
         complete("invite");
         setNotice("Demo invite recorded. No email was sent.");
       }} startDm={startDm} saveProfile={(name) => {
@@ -203,8 +199,4 @@ export function Workspace() {
       </Modal>}
     </div>
   );
-}
-
-function currentTime() {
-  return new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }

@@ -1,23 +1,27 @@
-﻿import { useEffect, useRef } from "react";
-import { conversationLabel, type Conversation, type Message, type Panel } from "@/lib/demo";
+import { useEffect, useRef } from "react";
+ import { conversationLabel, type Conversation, type Message, type Panel } from "@/lib/workspace/models";
 import { Icon, type IconName } from "./icon";
 import { MessageContent } from "./message-content";
 import { Avatar, IconButton } from "./ui";
 
-export function ChatHeader({ conversation, favorite, toggleFavorite, open, search, titleRef }: {
-  conversation: Conversation; favorite: boolean; toggleFavorite: () => void; open: (panel: Panel) => void; search: () => void;
+export function ChatHeader({ conversation, favorite = false, toggleFavorite, open, search, showMembers, titleRef }: {
+  conversation: Conversation; favorite?: boolean; toggleFavorite?: () => void; open?: (panel: Panel) => void; search?: () => void;
+  showMembers?: () => void;
   titleRef: React.Ref<HTMLHeadingElement>;
 }) {
   return (
     <header className="chat-header">
       <div className="chat-titlebar">
         <div className="chat-title">{conversation.person ? <Avatar person={conversation.person} status /> : <Icon name={conversation.private ? "lock" : "hash"} />}<h1 ref={titleRef} tabIndex={-1}>{conversation.name}</h1></div>
-        <IconButton icon="star" label="Favorite conversation" aria-pressed={favorite} className={favorite ? "favorite" : ""} onClick={toggleFavorite} />
+        {toggleFavorite && <IconButton icon="star" label="Favorite conversation" aria-pressed={favorite} className={favorite ? "favorite" : ""} onClick={toggleFavorite} />}
         <div className="chat-actions">
-          <IconButton icon="users" label="Conversation details" onClick={() => open("details")} />
-          <IconButton icon="bell" label="Notifications" onClick={() => open("notifications")} />
-          <IconButton icon="search" label="Search this conversation" onClick={search} />
-          <IconButton icon="more" label="More conversation details" onClick={() => open("details")} />
+          {showMembers && <IconButton icon="users" label="Conversation members" onClick={showMembers} />}
+          {open && <>
+            <IconButton icon="users" label="Conversation details" onClick={() => open("details")} />
+            <IconButton icon="bell" label="Notifications" onClick={() => open("notifications")} />
+          </>}
+          {search && <IconButton icon="search" label="Search this conversation" onClick={search} />}
+          {open && <IconButton icon="more" className="chat-more" label="More conversation details" onClick={() => open("details")} />}
         </div>
       </div>
       <div className="chat-tabs"><span><Icon name="chat" />Messages</span></div>
@@ -62,13 +66,15 @@ function ChannelWelcome({ conversation, empty, open }: { conversation: Conversat
   );
 }
 
-export function MessageList({ conversation, messages, open, target }: { conversation: Conversation; messages: Message[]; open: (panel: Panel) => void; target?: { id: string } }) {
+export function MessageList({ conversation, messages, open, target, historyControl }: {
+  conversation: Conversation; messages: Message[]; open?: (panel: Panel) => void; target?: { id: string }; historyControl?: React.ReactNode;
+}) {
   const scroll = useRef<HTMLDivElement>(null);
   const latest = messages.at(-1);
   const latestId = latest?.id;
   const lastFromProfile = latest?.author.id === "you";
   const empty = messages.length === 0;
-  const showWelcome = !conversation.person && (conversation.id === "general" || empty);
+  const showWelcome = open && !conversation.person && (conversation.id === "general" || empty);
 
   useEffect(() => {
     const container = scroll.current;
@@ -86,7 +92,7 @@ export function MessageList({ conversation, messages, open, target }: { conversa
   return (
     <div className="timeline" ref={scroll} role="region" aria-label="Conversation history" tabIndex={0}>
       <div className={`timeline-content ${empty ? "timeline-empty" : ""}`}>
-        {showWelcome && <ChannelWelcome conversation={conversation} empty={empty} open={open} />}
+        {showWelcome && open && <ChannelWelcome conversation={conversation} empty={empty} open={open} />}
         {!showWelcome && empty && (
           <section className="conversation-intro">
             {conversation.person && <Avatar person={conversation.person} />}
@@ -95,7 +101,8 @@ export function MessageList({ conversation, messages, open, target }: { conversa
           </section>
         )}
         <div className="message-stream">
-          {!empty && <div className="date-line"><span>Today</span></div>}
+          {historyControl}
+          {!empty && open && <div className="date-line"><span>Today</span></div>}
           <div role="log" aria-label="Messages" className="message-log">
             {messages.map((message) => (
               <article id={"message-" + message.id} key={message.id} className={target?.id === message.id ? "message message-target" : "message"}>
