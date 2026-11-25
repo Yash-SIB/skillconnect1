@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ApiError } from "@/lib/api/client";
-import type { ApiConversation, ApiMessagePage, SendMessageRequest } from "@/lib/api/models";
+import type { ApiConversation, ApiMessage, ApiMessagePage, SendMessageRequest } from "@/lib/api/models";
 import { createApiWorkspace, displayConversation, displayMessage } from "@/lib/workspace/api-adapter";
-import { acceptSent, appendOlder } from "@/lib/workspace/history";
+import { appendOlder, mergeMessages, reconcileRecovery, recoverHistory } from "@/lib/workspace/history";
 import type { Conversation, Person } from "@/lib/workspace/models";
 import { mayRetrySend, type Resource } from "@/lib/workspace/resource";
 import { prepareMessage } from "@/lib/workspace/sending";
+import { createWorkspaceSocket, type SocketStatus } from "@/lib/workspace/socket";
 import { ChatHeader, MessageList } from "./chat";
 import { MessageComposer } from "./composer";
 import { Modal } from "./dialogs";
@@ -18,10 +19,11 @@ import { WorkspaceStatus } from "./workspace-status";
 
 type Access =
   | { status: "configuration-pending" | "login-required" }
-  | { status: "ready"; workspaceId: string };
+  | { status: "ready"; workspaceId: string; realtime: "configuration-pending" | "gateway-ready" };
 
 export function LiveWorkspaceEntry({ access }: { access: Access }) {
-  if (access.status === "ready") return <LiveWorkspace key={access.workspaceId} workspaceId={access.workspaceId} />;
+  if (access.status === "ready") return <LiveWorkspace key={access.workspaceId + access.realtime}
+    workspaceId={access.workspaceId} realtimeEnabled={access.realtime === "gateway-ready"} />;
   return <LiveGate loginRequired={access.status === "login-required"} />;
 }
 
@@ -39,9 +41,18 @@ function LiveGate({ loginRequired }: { loginRequired: boolean }) {
 }
 
 type Adapter = ReturnType<typeof createApiWorkspace>;
+type WorkspaceSocket = ReturnType<typeof createWorkspaceSocket>;
 const emptyPeople = new Map<string, Person>();
 
-function LiveWorkspace({ workspaceId }: { workspaceId: string }) {
+const connectionLabels: Record<SocketStatus, string> = {
+  connecting: "Connecting",
+  connected: "Connected",
+  reconnecting: "Reconnecting",
+  disconnected: "Disconnected",
+  failed: "Failed",
+};
+
+function LiveWorkspace({ workspaceId, realtimeEnabled }: { workspaceId: string; realtimeEnabled: boolean }) {
   const adapter = useMemo(() => createApiWorkspace(workspaceId), [workspaceId]);
   const [items, setItems] = useState<Resource<ApiConversation[]>>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
@@ -53,15 +64,23 @@ function LiveWorkspace({ workspaceId }: { workspaceId: string }) {
   const closeButton = useRef<HTMLButtonElement>(null);
   const title = useRef<HTMLHeadingElement>(null);
   const [pendingSends, setPendingSends] = useState(() => new Map<string, SendMessageRequest>());
+  const [connection, setConnection] = useState<SocketStatus>("disconnected");
+  const [socket] = useState(() => createWorkspaceSocket({ enabled: realtimeEnabled, onStatus: setConnection }));
+
+  useEffect(() => {
+    if (!expired) socket.start();
+    return () => socket.stop();
+  }, [socket, expired]);
 
   const checkSession = useCallback((error: unknown) => {
     if (error instanceof ApiError && error.status === 401) {
+      socket.stop();
       setPendingSends(new Map());
       setPeople({});
       setItems({ status: "loading" });
       setExpired(true);
     }
-  }, []);
+  }, [socket]);
 
   useEffect(() => {
     if (expired) return;
@@ -112,6 +131,7 @@ function LiveWorkspace({ workspaceId }: { workspaceId: string }) {
           }} />
           <strong>SkillConnect</strong>
         </div>
+        <p className="workspace-connection" role="status">Realtime {realtimeEnabled ? connectionLabels[connection].toLowerCase() : "disconnected · gateway pending"}</p>
       </header>
       <div className="rail"><span className="workspace-mark"><BrandMark /></span></div>
       <WorkspaceSidebar conversations={conversations} activeId={conversation?.id ?? ""} choose={(id) => {
@@ -121,7 +141,8 @@ function LiveWorkspace({ workspaceId }: { workspaceId: string }) {
       }} mobileOpen={mobileOpen} closeMobile={closeNavigation} closeButtonRef={closeButton} />
       {conversation ? <LiveConversation key={conversation.id} conversation={conversation} adapter={adapter}
         title={title} people={people[conversation.id] ?? emptyPeople}
-        rememberMembers={rememberMembers} checkSession={checkSession} pendingSend={pendingSends.get(conversation.id)} rememberSend={rememberSend} /> :
+        rememberMembers={rememberMembers} checkSession={checkSession} pendingSend={pendingSends.get(conversation.id)}
+        rememberSend={rememberSend} socket={realtimeEnabled ? socket : undefined} /> :
         <main className="chat">
           {items.status === "loading" && <WorkspaceStatus loading="Loading conversations…" />}
           {items.status === "error" && <WorkspaceStatus error={items.error} retry={() => {
@@ -134,7 +155,7 @@ function LiveWorkspace({ workspaceId }: { workspaceId: string }) {
   );
 }
 
-function LiveConversation({ conversation, adapter, title, people, rememberMembers, checkSession, pendingSend, rememberSend }: {
+function LiveConversation({ conversation, adapter, title, people, rememberMembers, checkSession, pendingSend, rememberSend, socket }: {
   conversation: Conversation;
   adapter: Adapter;
   title: React.Ref<HTMLHeadingElement>;
@@ -143,9 +164,12 @@ function LiveConversation({ conversation, adapter, title, people, rememberMember
   checkSession: (error: unknown) => void;
   pendingSend?: SendMessageRequest;
   rememberSend: (id: string, input?: SendMessageRequest) => void;
+  socket?: WorkspaceSocket;
 }) {
   const { id } = conversation;
   const [history, setHistory] = useState<Resource<ApiMessagePage>>({ status: "loading" });
+  const [arrivals, setArrivals] = useState<ApiMessage[]>([]);
+  const [recoveryNotice, setRecoveryNotice] = useState("");
   const [members, setMembers] = useState<Resource<Person[]>>({ status: "loading" });
   const [showMembers, setShowMembers] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -158,6 +182,7 @@ function LiveConversation({ conversation, adapter, title, people, rememberMember
   const composer = useRef<HTMLTextAreaElement>(null);
   const sendingNow = useRef(false);
   const pagingNow = useRef(false);
+  const restBoundary = useRef<string>(undefined);
 
   useEffect(() => {
     const request = new AbortController();
@@ -186,12 +211,58 @@ function LiveConversation({ conversation, adapter, title, people, rememberMember
   }, [adapter, attempt, checkSession, id, rememberMembers]);
 
   const page = history.status === "ready" ? history.value : undefined;
-  const messages = (page?.messages ?? []).map((entry) => displayMessage(entry, people)).reverse();
+  const boundary = page?.messages.at(-1)?.id;
+  const ready = page !== undefined;
+
+  useEffect(() => {
+    restBoundary.current = boundary;
+  }, [boundary]);
+
+  useEffect(() => {
+    if (!socket || !ready) return;
+    let recovery: AbortController | undefined;
+    const unsubscribe = socket.subscribe({
+      id,
+      message(entry) {
+        if (entry.conversation_id === id) setArrivals((current) => mergeMessages(current, [entry]));
+      },
+      rejected() {
+        setRecoveryNotice("Live updates are unavailable for this conversation.");
+      },
+      subscribed() {
+        recovery?.abort();
+        const request = new AbortController();
+        recovery = request;
+        setRecoveryNotice("Checking for missed messages…");
+        recoverHistory((cursor, signal) => adapter.history(id, { cursor, limit: 100 }, signal), restBoundary.current, request.signal)
+          .then((result) => {
+            if (request.signal.aborted) return;
+            setHistory((current) => current.status === "ready" ? { status: "ready", value: reconcileRecovery(current.value, result) } : current);
+            setRecoveryNotice(result.coverage === "incomplete" ? "History may have gaps. Reload to browse from the newest page." : "");
+          }, (error) => {
+            if (request.signal.aborted) return;
+            checkSession(error);
+            if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
+              setHistory({ status: "error", error });
+              setArrivals([]);
+            } else setRecoveryNotice("Could not check for missed messages. Reload to try again.");
+          });
+      },
+    });
+    return () => {
+      recovery?.abort();
+      unsubscribe();
+    };
+  }, [adapter, checkSession, id, ready, socket]);
+
+  const messages = useMemo(() => mergeMessages(page?.messages ?? [], arrivals).map((entry) =>
+    displayMessage(entry, people)).reverse(), [page, arrivals, people]);
 
   function reload() {
     setHistory({ status: "loading" });
     setMembers({ status: "loading" });
     setOlderError(undefined);
+    setRecoveryNotice("");
     setAttempt((value) => value + 1);
   }
 
@@ -203,13 +274,14 @@ function LiveConversation({ conversation, adapter, title, people, rememberMember
     setOlderError(undefined);
     try {
       const older = await adapter.history(id, { cursor: page.next_cursor }, signal);
-      if (!signal.aborted) setHistory((current) => current.status === "ready"
+      if (!signal.aborted) setHistory((current) => current.status === "ready" && current.value.next_cursor === page.next_cursor
         ? { status: "ready", value: appendOlder(current.value, older) } : current);
     } catch (error) {
       if (signal.aborted) return;
       checkSession(error);
       if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
         setHistory({ status: "error", error });
+        setArrivals([]);
       } else setOlderError({ error });
     } finally {
       pagingNow.current = false;
@@ -230,8 +302,7 @@ function LiveConversation({ conversation, adapter, title, people, rememberMember
       if (signal.aborted) return;
       rememberSend(id);
       setDraft((current) => current === input.body ? "" : current);
-      setHistory((current) => current.status === "ready"
-        ? { status: "ready", value: acceptSent(current.value, message) } : current);
+      if (message.conversation_id === id) setArrivals((current) => mergeMessages(current, [message]));
       composer.current?.focus();
     } catch (error) {
       if (signal.aborted) return;
@@ -250,10 +321,15 @@ function LiveConversation({ conversation, adapter, title, people, rememberMember
       {history.status === "loading" && <WorkspaceStatus loading="Loading message history…" />}
       {history.status === "error" && <WorkspaceStatus error={history.error} retry={reload} />}
       {page && <>
-        <MessageList conversation={conversation} messages={messages} historyControl={
-          olderError ? <WorkspaceStatus error={olderError.error} retry={() => { void loadOlder(); }} /> :
+        <MessageList conversation={conversation} messages={messages} historyControl={<>
+          {recoveryNotice && <div className="workspace-state" role="status">
+            <p>{recoveryNotice}</p>
+            {!recoveryNotice.startsWith("Checking") && <button className="primary-button" type="button" onClick={reload}>Reload history</button>}
+          </div>}
+          {olderError ? <WorkspaceStatus error={olderError.error} retry={() => { void loadOlder(); }} /> :
             page.next_cursor && <button className="history-button" type="button" disabled={loadingOlder} onClick={() => { void loadOlder(); }}>{loadingOlder ? "Loading earlier messages…" : "Load earlier messages"}</button>
-        } />
+          }
+        </>} />
         <div>
           {sendError && <WorkspaceStatus error={sendError.error} retry={mayRetrySend(sendError.error) && !sending && draft.trim()
             ? () => { void send(); } : undefined} />}
