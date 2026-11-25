@@ -35,6 +35,8 @@ Conversations, drafts, messages, profile changes, and checklist progress live in
 
 The sign-in preview is at [localhost:3000/login](http://localhost:3000/login) and needs no credentials. See the [authentication plan](docs/authentication.md) for the Google Cloud setup, employee approval rules, and future Go API trust boundary.
 
+The demo stays at `/`. The live entry point at `/workspace` shows configuration pending until verified employee access and the same-origin messaging gateway are ready. The [web README](apps/web/README.md) describes both modes and their tests.
+
 ## Backend
 
 The [Go API guide](apps/api/README.md) covers the local PostgreSQL setup, migrations, health endpoint, and tests.

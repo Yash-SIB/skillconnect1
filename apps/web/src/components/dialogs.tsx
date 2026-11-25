@@ -1,5 +1,5 @@
-﻿import { useLayoutEffect, useId, useRef, useState, type FormEvent } from "react";
-import { conversationLabel, people, type Conversation, type Panel, type Person } from "@/lib/demo";
+import { useLayoutEffect, useId, useRef, useState, type FormEvent } from "react";
+ import { conversationLabel, type Conversation, type Panel, type Person } from "@/lib/workspace/models";
 import { AppsPreview, demoApps } from "./apps";
 import { Icon } from "./icon";
 import { Avatar, IconButton } from "./ui";
@@ -38,8 +38,8 @@ const titles: Record<Panel, string> = {
   details: "Conversation details", notifications: "Notifications", call: "Voice and video calls",
 };
 
-export function WorkspaceDialog({ panel, close, conversation, profile, addChannel, invite, startDm, saveProfile, handbook, saveHandbook, welcome, saveWelcome }: {
-  panel: Panel; close: () => void; conversation: Conversation; profile: Person;
+export function WorkspaceDialog({ panel, close, conversation, profile, teammates, addChannel, invite, startDm, saveProfile, handbook, saveHandbook, welcome, saveWelcome }: {
+  panel: Panel; close: () => void; conversation: Conversation; profile: Person; teammates: Person[];
   addChannel: (name: string, description: string, privateChannel: boolean) => string | undefined; invite: () => void;
   startDm: (person: Person) => void; saveProfile: (name: string) => void; handbook: string; saveHandbook: (text: string) => void;
   welcome: string; saveWelcome: (text: string) => void;
@@ -98,7 +98,7 @@ export function WorkspaceDialog({ panel, close, conversation, profile, addChanne
           <button type="submit" className="primary-button">{form.action}</button>
         </form>
       )}
-      {panel === "dm" && <div className="dialog-list">{people.map((person) => <button type="button" key={person.id} onClick={() => { startDm(person); close(); }}><Avatar person={person} status />{person.name}<Icon name="arrow" /></button>)}</div>}
+      {panel === "dm" && <div className="dialog-list">{teammates.map((person) => <button type="button" key={person.id} onClick={() => { startDm(person); close(); }}><Avatar person={person} status />{person.name}<Icon name="arrow" /></button>)}</div>}
       {panel === "apps" && <AppsPreview />}
       {(panel === "calendar" || panel === "drive") && <AppsPreview app={panel} />}
       {panel === "files" && <p>File sharing is unavailable in the local demo.</p>}

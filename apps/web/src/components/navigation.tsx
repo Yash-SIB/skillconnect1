@@ -1,4 +1,4 @@
-﻿import { channels, setupTasks, type Conversation, type Panel, type Person, type Task } from "@/lib/demo";
+ import { setupTasks, type Conversation, type Panel, type Person, type Task } from "@/lib/workspace/models";
 import { appIds, AppIcon, demoApps } from "./apps";
 import { Icon, type IconName } from "./icon";
 import { Avatar, BrandMark, IconButton } from "./ui";
@@ -71,9 +71,9 @@ export function SetupChecklist({ done, open, focusComposer }: { done: Task[]; op
   );
 }
 
-export function WorkspaceSidebar({ conversations, activeId, choose, open, done, focusComposer, mobileOpen, closeMobile, closeButtonRef }: {
-  conversations: Conversation[]; activeId: string; choose: (id: string) => void; open: OpenPanel; done: Task[];
-  focusComposer: () => void; mobileOpen: boolean; closeMobile: () => void; closeButtonRef: React.Ref<HTMLButtonElement>;
+export function WorkspaceSidebar({ conversations, activeId, choose, open, done, focusComposer, mobileOpen, closeMobile, closeButtonRef, homeId }: {
+  conversations: Conversation[]; activeId: string; choose: (id: string) => void; open?: OpenPanel; done?: Task[];
+  focusComposer?: () => void; mobileOpen: boolean; closeMobile: () => void; closeButtonRef: React.Ref<HTMLButtonElement>; homeId?: string;
 }) {
   const renderRow = (conversation: Conversation) => <ConversationRow key={conversation.id} conversation={conversation} active={conversation.id === activeId} choose={choose} />;
   return (
@@ -81,29 +81,32 @@ export function WorkspaceSidebar({ conversations, activeId, choose, open, done, 
       if (mobileOpen && event.key === "Escape") closeMobile();
     }}>
       <div className="sidebar-header">
-        <button className="workspace-title" type="button" onClick={() => open("workspace")}><span>Skillinabox<small>Team workspace</small></span><Icon name="chevron" /></button>
-        <IconButton icon="pen" label="New direct message" className="desktop-compose" onClick={() => open("dm")} />
+        {open ? <button className="workspace-title" type="button" onClick={() => open("workspace")}><span>Skillinabox<small>Team workspace</small></span><Icon name="chevron" /></button> :
+          <div className="workspace-title"><span>Skillinabox<small>Team workspace</small></span></div>}
+        {open && <IconButton icon="pen" label="New direct message" className="desktop-compose" onClick={() => open("dm")} />}
         <IconButton ref={closeButtonRef} icon="close" label="Close navigation" className="mobile-close" onClick={closeMobile} />
       </div>
-      <nav className="sidebar-scroll" aria-label="Channels, direct messages, and apps">
-        <Section title="Channels" icon="hash" action={() => open("channel")} actionLabel="Create channel">
+      <nav className="sidebar-scroll" aria-label={open ? "Channels, direct messages, and apps" : "Channels and direct messages"}>
+        <Section title="Channels" icon="hash" action={open && (() => open("channel"))} actionLabel="Create channel">
           {conversations.filter((conversation) => !conversation.person).map(renderRow)}
-          <button type="button" className="side-row side-action" onClick={() => open("channel")}><Icon name="plus" />Add channel</button>
+          {open && <button type="button" className="side-row side-action" onClick={() => open("channel")}><Icon name="plus" />Add channel</button>}
         </Section>
         <Section title="Direct messages" icon="users">
           {conversations.filter((conversation) => conversation.person).map(renderRow)}
-          <button type="button" className="side-row side-action" onClick={() => open("dm")}><Icon name="plus" />New direct message</button>
-          <button type="button" className="side-row side-action" onClick={() => open("invite")}><Icon name="userPlus" />Invite people</button>
+          {open && <>
+            <button type="button" className="side-row side-action" onClick={() => open("dm")}><Icon name="plus" />New direct message</button>
+            <button type="button" className="side-row side-action" onClick={() => open("invite")}><Icon name="userPlus" />Invite people</button>
+          </>}
         </Section>
-        <Section title="Apps" icon="grid">
+        {open && <Section title="Apps" icon="grid">
           {appIds.map((app) => (
             <button key={app} type="button" className="side-row" aria-haspopup="dialog" onClick={() => open(app)}><AppIcon app={app} />{demoApps[app].name}</button>
           ))}
           <button type="button" className="side-row side-action" aria-haspopup="dialog" onClick={() => open("apps")}><Icon name="plus" />Connect apps</button>
-        </Section>
-        <button className="mobile-home side-row" type="button" onClick={() => choose(channels[0].id)}><Icon name="home" />Workspace home</button>
+        </Section>}
+        {homeId && <button className="mobile-home side-row" type="button" onClick={() => choose(homeId)}><Icon name="home" />Workspace home</button>}
       </nav>
-      <div className="sidebar-footer"><SetupChecklist done={done} open={open} focusComposer={focusComposer} /></div>
+      {open && done && focusComposer && <div className="sidebar-footer"><SetupChecklist done={done} open={open} focusComposer={focusComposer} /></div>}
     </aside>
   );
 }

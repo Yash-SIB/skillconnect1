@@ -231,6 +231,19 @@ button, summary { -webkit-tap-highlight-color: transparent; }
 .notice { position: fixed; right: 12px; top: 65px; z-index: 2; display: flex; align-items: center; gap: 9px; padding: 5px 8px 5px 11px; max-width: calc(100vw - 24px); border-radius: 8px; border: 1px solid #4b6570; background: #243b44; box-shadow: 0 6px 20px #0008; pointer-events: none; }
 .notice button { pointer-events: auto; }
 
+.live-gate { min-height: 100dvh; display: grid; place-items: center; padding: 20px; }
+.live-gate-card { width: min(100%, 430px); display: grid; justify-items: start; gap: 12px; padding: clamp(22px, 6vw, 34px); border: 1px solid var(--border); border-radius: 15px; background: #252b31; }
+.live-gate h1 { font-size: 24px; font-weight: 750; line-height: 1.2; }
+.live-gate p, .workspace-state { color: var(--muted); }
+.live-gate a, .workspace-state a { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
+.live-gate a:focus-visible, .workspace-state a:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+.workspace-state { display: grid; justify-items: start; gap: 8px; align-content: start; padding: 14px var(--chat-gutter, 14px); }
+.workspace-state .primary-button { justify-self: start; }
+.conversation-members { display: grid; gap: 8px; }
+.conversation-members li { display: flex; gap: 9px; align-items: center; }
+.history-button { display: block; margin: 8px auto; padding: 5px 10px; color: var(--blue); border: 1px solid var(--border); border-radius: 6px; }
+.history-button:hover { background: var(--surface); }
+
 @media (max-width: 1080px) {
   .workspace { grid-template-columns: 68px 233px minmax(0, 1fr); }
   .welcome-art { right: -27px; transform: translateY(-50%) scale(.78); }
@@ -273,7 +286,7 @@ button, summary { -webkit-tap-highlight-color: transparent; }
   .global-search { font-size: 12px; gap: 5px; padding: 0 7px; }
   .chat-titlebar { gap: 4px; min-height: 46px; }
   .chat-actions { gap: 0; }
-  .chat-actions > :last-child { display: none; }
+  .chat-actions .chat-more { display: none; }
   .chat-titlebar .icon-button { width: 29px; }
   .chat-title h1 { font-size: 17px; }
   .composer-tools { padding-inline: 4px; }

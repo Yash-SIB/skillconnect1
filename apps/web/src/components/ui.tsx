@@ -1,5 +1,5 @@
-﻿import type { ComponentProps } from "react";
-import type { Person } from "@/lib/demo";
+import type { ComponentProps } from "react";
+import type { Person } from "@/lib/workspace/models";
 import { Icon, type IconName } from "./icon";
 
 export function IconButton({ icon, label, className = "", ...props }: ComponentProps<"button"> & { icon: IconName; label: string }) {

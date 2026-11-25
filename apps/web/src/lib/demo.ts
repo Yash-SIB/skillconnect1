@@ -1,10 +1,4 @@
-﻿export type Person = { id: string; name: string; initials: string; color: string; online?: boolean };
-export type Conversation = { id: string; name: string; description: string; person?: Person; private?: boolean };
-export type Message = { id: string; author: Person; text: string; time: string; attachments?: string[] };
-
-export function conversationLabel(conversation: Conversation) {
-  return conversation.person ? conversation.name : "#" + conversation.name;
-}
+import type { Conversation, Message, Person } from "./workspace/models.ts";
 
 export const profile: Person = { id: "you", name: "Alex Morgan", initials: "AM", color: "violet", online: true };
 
@@ -35,13 +29,3 @@ export const initialMessages: Record<string, Message[]> = {
   announcements: [{ id: "update", author: people[0], time: "9:15 AM", text: "Our next team demo is on Friday. Bring something you’d like to share!" }],
   maya: [{ id: "hello", author: people[0], time: "11:00 AM", text: "Hey Alex! Let me know if you need a hand getting set up." }],
 };
-
-export const setupTasks = {
-  channel: "Set up your first channel",
-  invite: "Invite teammates",
-  message: "Send your first message",
-  profile: "Complete your profile",
-};
-
-export type Task = keyof typeof setupTasks;
-export type Panel = "channel" | "invite" | "dm" | "apps" | "calendar" | "drive" | "profile" | "handbook" | "welcome" | "files" | "workspace" | "details" | "notifications" | "call";
